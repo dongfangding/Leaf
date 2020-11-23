@@ -2,19 +2,18 @@ package com.sankuai.inf.leaf.snowflake;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Maps;
+import com.sankuai.inf.leaf.common.PropertyFactory;
 import com.sankuai.inf.leaf.snowflake.exception.CheckLastTimeException;
 import org.apache.commons.io.FileUtils;
+import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.retry.RetryUntilElapsed;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.Maps;
-import com.sankuai.inf.leaf.common.*;
-import org.apache.curator.RetryPolicy;
-import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.zookeeper.CreateMode;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,6 +29,7 @@ public class SnowflakeZookeeperHolder {
     private static final Logger LOGGER = LoggerFactory.getLogger(SnowflakeZookeeperHolder.class);
     private String zk_AddressNode = null;//保存自身的key  ip:port-000000001
     private String listenAddress = null;//保存自身的key ip:port
+
     private int workerID;
     private static final String PREFIX_ZK_PATH = "/snowflake/" + PropertyFactory.leafname;
     private static final String PROP_PATH = System.getProperty("java.io.tmpdir") + File.separator + PropertyFactory.leafname + "/leafconf/{port}/workerID.properties";
@@ -48,7 +48,9 @@ public class SnowflakeZookeeperHolder {
 
     public boolean init() {
         try {
-            CuratorFramework curator = createWithOptions(connectionString, new RetryUntilElapsed(1000, 4), 10000, 6000);
+            RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+            CuratorFramework curator = CuratorFrameworkFactory.newClient(connectionString, 6000, 10000, retryPolicy);
+//            CuratorFramework curator = createWithOptions(connectionString, new RetryUntilElapsed(1000, 4), 10000, 6000);
             curator.start();
             Stat stat = curator.checkExists().forPath(PATH_FOREVER);
             if (stat == null) {
